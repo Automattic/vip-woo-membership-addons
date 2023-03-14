@@ -2,7 +2,7 @@
 
 *Work in progress* 
 
-A WordPress Plugin Provide workarounds for working with WooCommerce Memberships exports on VIP Platform.
+A WordPress Plugin to provide workarounds for working with WooCommerce Membership exports on VIP Platform.
 
 ## Dependencies
 * Woocommerce

@@ -28,9 +28,11 @@ class VIP_Woocommerce_Memberships_Dependencies {
 
     public function load_class( $local_path, $class_name ) {
 
-		require_once( $this->get_plugin_path() . $local_path );
+        if ( ! class_exists( $class_name ) ) {
+            require_once( $this->get_plugin_path() . $local_path );
+        }
 
-		return new $class_name;
+        return new $class_name;
 	}
 
     public function includes() {
@@ -68,9 +70,6 @@ class VIP_Woocommerce_Memberships_Dependencies {
         // load utilities
         $this->utilities = $this->load_class( '/src/class-wc-memberships-utilities.php', 'WC_Memberships_Utilities' );
     
-        // // load integrations
-        $this->integrations = $this->load_class( '/src/integrations/class-wc-memberships-integrations.php', 'WC_Memberships_Integrations' );
-
         $this->user_memberships_export   = $this->load_class( '/src/utilities/class-wc-memberships-csv-export-user-memberships.php', 'WC_Memberships_CSV_Export_User_Memberships' );
     }
 

@@ -18,21 +18,15 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 
     public function export_subscribers( $params ) {
 
-        // TODO: pass params in as named args
-
-        if( false !== $params['export_id'] ) {
-            // TODO: this could be used to retrieve and continue an existing export
-
-        } else {
-            // Create a new export_id
-            $params['export_id'] = dechex( microtime( true ) * 1000 ) . bin2hex( random_bytes( 16 ) );
-        }
+        // Create a new export_id
+        $params['export_id'] = dechex( microtime( true ) * 1000 ) . bin2hex( random_bytes( 16 ) );
 
         $attrs = [
             'user_membership_ids'    => [],
             'include_profile_fields' => isset( $params['include_profile_fields'] ) && 'yes' === $params['include_profile_fields'],
             'include_meta_data'      => isset( $params['include_meta'] ) && 'yes' === $params['include_meta'],
             'fields_delimiter'       => ! empty( $params['fields_delimiter'] ) ? $params['fields_delimiter'] : 'comma',
+			'export_id' => $params['export_id'],
         ];
 
         $this->job = $this->create_job( $attrs );
@@ -185,6 +179,14 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 							$value = $user_membership->get_product_id();
 						break;
 
+						case 'subscription_id' :
+							$value = $this->get_subscription_id( $user_membership );
+						break;
+
+						case 'installment_plan' :
+							$value = $this->has_installment_plan( $user_membership );
+						break;
+
 						case 'order_id' :
 							$value = $user_membership->get_order_id();
 						break;
@@ -235,7 +237,10 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
         $query_args['post_status'] = 'any';
 		$query_args['nopaging']  = true; // phpcs:ignore WordPressVIPMinimum.Performance.NoPaging.nopaging_nopaging
 
-		return get_posts( $query_args );
+		$results = get_posts( $query_args );
+		$results = array_slice( $results, 0, 2500 );
+
+		return $results;
 	}
 
     private function get_status( $subscriber_post ) {
@@ -300,6 +305,30 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 		return ! empty( $date ) ? wc_memberships_format_date( $date, $format ) : null;
 	}
 
+	private function get_subscription_id( $user_membership ) {
+		$subscription_id = null;
+
+		if ( $user_membership instanceof \WC_Memberships_User_Membership ) {
+
+			$integration     = wc_memberships()->get_integrations_instance()->get_subscriptions_instance();
+			$subscription_id = $integration ? $integration->get_user_membership_subscription_id( $user_membership->get_id() ) : null;
+		}
+
+		return is_numeric( $subscription_id ) ? (int) $subscription_id : null;
+	}
+
+	private function has_installment_plan( $user_membership ) {
+		$has_installment_plan = 'no';
+
+		if ( $user_membership instanceof \WC_Memberships_User_Membership && class_exists( 'WC_Memberships_Integration_Subscriptions_User_Membership' ) ) {
+			$user_membership_id      = is_object( $user_membership ) ? $user_membership->get_id() : (int) $user_membership;
+			$subscription_membership = is_numeric( $user_membership_id ) ? new \WC_Memberships_Integration_Subscriptions_User_Membership( $user_membership_id ) : null;
+			$has_installment_plan = $subscription_membership && $subscription_membership->has_installment_plan() ? 'yes' : 'no';
+		}
+
+		return $has_installment_plan;
+	}
+
     /**
 	 * Creates a new export job and its corresponding output file.
 	 *
@@ -311,8 +340,8 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 	 */
 	public function create_job( $attrs ) {
 
-		// makes the current export job file name unique for the current user
-		$file_id   = md5( http_build_query( wp_parse_args( $attrs, array( 'user_id' => get_current_user_id() ) ) ) );
+		// makes the current export job file name unique
+		$file_id   = $attrs['export_id'];
 		$file_name = $this->get_file_name( $file_id );
 		$file_path = $this->get_file_path( $file_name );
 		$file_url  = $this->get_file_url( $file_name );
