@@ -10,6 +10,8 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
     /** @var string exports folder name */
 	private $exports_dir;
 
+	protected $identifier = 'vipwma';
+
     public function __construct(){
         $this->action      = 'csv_export_user_memberships';
 		$this->data_key    = 'user_membership_ids';
@@ -48,20 +50,34 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
         $headers = $this->get_headers( $params );
         $subscribers = $this->get_subscribers( $params );
 
+		$this->job->total = count( $subscribers );
+		$this->job->percentage = 0;
+		$this->job->status = 'processing';
+		$this->job = $this->update_job( $this->job );
+
         // output as csv to tmp file
         $file_handle = fopen($export_tmp_file_path,"a"); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_fopen
         $delimiter = $this->get_csv_delimiter( $this->job );
         $enclosure = $this->get_csv_enclosure();
         fputcsv( $file_handle, $this->prepare_csv_row_data( $headers, $headers ), $delimiter, $enclosure ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fputcsv
         
+		$processed_memberships = 0;
+
         foreach( $subscribers as $subscriber ){
             fputcsv( $file_handle, $this->prepare_csv_row_data( $headers, $subscriber ), $delimiter, $enclosure ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fputcsv
+			$processed_memberships += 1;
         }
-        
+
         fclose( $file_handle );
 
         // copy file to export location
         copy( $export_tmp_file_path, $this->job->file_path );
+
+		// update job status
+		$this->job->status = 'completed';
+		$this->job->progress  = $processed_memberships;
+		$this->job->percentage = $this->get_percentage( $this->job );
+		$this->job = $this->update_job( $this->job );
 
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
             \WP_CLI::log('file copied to ' . $this->job->file_url );
@@ -305,6 +321,66 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 		return $results;
 	}
 
+	public function get_export_list( $assoc_args ) {
+		$jobs = $this->get_jobs( ['queued', 'processing', 'completed'] );
+		//print_r( $jobs );
+
+		$data = [];
+		foreach( $jobs as $job ) {
+			$data[] = [
+				'id' => $job->id,
+				'created' => $job->created_at,
+				'status' => $job->status,
+			];
+		}
+
+		$formatter = new \WP_CLI\Formatter( $assoc_args, [ 'id', 'created', 'status', ], 'exports' );
+		$formatter->display_items( $data );
+	}
+
+	public function get_export( $id ) {
+		$job = $this->get_job( $id );
+		if( ! is_null( $job ) ) {
+			return $job;
+		}
+	}
+
+	public function delete_export( $job ) {
+		// delete the export file
+		if( is_file( $job->file_path ) ) {
+			unlink( $job->file_path );
+		}
+
+		// delete the job
+		$this->delete_job( $job->id );
+
+		return true;
+	}
+
+	/**
+	 * @desc schedule a daily cron event to delete all exports over 24 hours old
+	 */
+	public function schedule_cleanup( ) {
+		if ( ! wp_next_scheduled( 'vipwma_export_cleanup') ) {
+			$time = time();
+			wp_schedule_event($time, 'daily', 'vipwma_export_cleanup');
+		}
+	}
+
+	public function export_cleanup( $manual=false ) {
+		$jobs = $this->get_jobs( ['queued', 'processing', 'completed'] );
+		foreach( $jobs as $job ){
+			$time_now = time();
+			$job_time = strtotime( $job->created_at );
+			if( ( $time_now - $job_time ) > 60*60*24 ){
+				\WP_CLI::log( 'job ' . $job->id . ' is over 24 hours old, deleting' );
+				$this->delete_job( $job->id );
+			} else {
+				\WP_CLI::log( 'job ' . $job->id . ' is less than 24 hours old, leaving' );
+			}
+		}
+	}
+
     private function get_status( $subscriber_post ) {
         return 0 === strpos( $subscriber_post->post_status, 'wcm-' ) ? substr( $subscriber_post->post_status, 4 ) : $subscriber_post->post_status;
     }
@@ -401,6 +477,8 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 	 * @throws Framework\SV_WC_Plugin_Exception
 	 */
 	public function create_job( $attrs ) {
+
+
 
 		// makes the current export job file name unique
 		$file_id   = $attrs['export_id'];

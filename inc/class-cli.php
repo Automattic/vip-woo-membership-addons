@@ -50,6 +50,11 @@ class VIP_Woo_Membership_CLI {
         $progress->finish();
     }
 
+    /**
+     * Export subscribers
+     */
+
+    // Usage: wp vip-woo-membership exportsubscribers
     public function exportsubscribers( $args, $assoc_args ) {
 
         /**
@@ -73,6 +78,53 @@ class VIP_Woo_Membership_CLI {
         $membership = new \VIPWooMembershipAddons\Membership;
         $membership->export_subscribers( $params );
 
+    }
+
+    /**
+     * List current exports
+     */
+
+    // Usage: wp vip-woo-membership listexports
+    public function listexports( $args, $assoc_args ) {
+        $membership = new \VIPWooMembershipAddons\Membership;
+        $exports = $membership->get_export_list( $assoc_args );
+    }
+
+    /**
+     * Delete specific export by id
+     *
+     * ## OPTIONS
+     *
+     * <id>
+     * : The id of the export as displayed in the export list.
+     * 
+     * ## EXAMPLES
+     *
+     * wp vip-woo-membership deleteexports xyz123
+     */
+
+    // Usage: wp vip-woo-membership deleteexports <id>
+    public function deleteexport( $args, $assoc_args ) {
+        if(sizeof( $args ) > 0 && strlen( trim( $args[0] ) ) > 0 ){
+            // check if the export exists
+            $membership = new \VIPWooMembershipAddons\Membership;
+            $export = $membership->get_export( trim( $args[0] ) );
+            if ( $export !== null ) { 
+                if ( $membership->delete_export( $export ) ) {
+                    WP_CLI::log( 'export deleted' );
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete all exports over 24 hours old
+     */
+
+    // Usage: wp vip-woo-membership exportcleanup
+    public function exportcleanup( ) {
+        $membership = new \VIPWooMembershipAddons\Membership;
+        $membership->export_cleanup( true );
     }
 
 }

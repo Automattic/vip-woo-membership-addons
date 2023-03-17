@@ -83,6 +83,15 @@ function vip_woo_addons(){
     }
     include_once __DIR__ . '/inc/class-membership.php';
 }
-add_action( 'plugins_loaded', 'VIPWooMembershipAddons\vip_woo_addons', 20, 2 );
+add_action( 'plugins_loaded', '\VIPWooMembershipAddons\vip_woo_addons', 20, 2 );
+
+function vip_woo_activate( ) {
+    include_once __DIR__ . '/inc/class-membership.php';
+    $membership = new \VIPWooMembershipAddons\Membership;
+    $membership->schedule_cleanup();
+  
+}
+register_activation_hook( __FILE__, 'VIPWooMembershipAddons\vip_woo_activate' );
+add_action( 'vipwma_export_cleanup', '\VIPWooMembershipAddons\Membership\export_cleanup()' );
 
 
