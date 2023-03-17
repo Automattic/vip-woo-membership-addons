@@ -221,13 +221,13 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
     }
 
     /**
-	 * Returns user membership IDs to export. 
+	 * Returns user membership to export. 
 	 *
-	 * @param array $params export arguments
-	 * @return int[] User Memberships IDs or empty array if none found
+	 * @param array $export_args export arguments
+	 * @return array User Membership posts or  empty array if none found
 	 * 
 	 */
-	private function get_subscriber_posts( array $params ) {
+	private function get_subscriber_posts( array $export_args ) {
 
 		$query_args = [];
 
@@ -237,8 +237,70 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
         $query_args['post_status'] = 'any';
 		$query_args['nopaging']  = true; // phpcs:ignore WordPressVIPMinimum.Performance.NoPaging.nopaging_nopaging
 
+		// specific user membership IDs may be specified in the bulk action
+		if ( isset( $export_args['user_membership_ids'] ) ) {
+
+			if ( is_array( $export_args['user_membership_ids'] ) ) {
+
+				$query_args['post__in'] = array_map( 'absint', $export_args['user_membership_ids'] );
+
+			} elseif ( 'undefined' === $export_args['user_membership_ids'] ) {
+
+				throw new Framework\SV_WC_Plugin_Exception( esc_html__( 'No User Memberships selected for export.', 'woocommerce-memberships' ) );
+			}
+		}
+
+		$start_from_date = ! empty( $export_args['start_date_from'] ) ? $export_args['start_date_from'] : false;
+		$start_to_date   = ! empty( $export_args['start_date_to'] )   ? $export_args['start_date_to']   : false;
+		$end_from_date   = ! empty( $export_args['end_date_from'] )   ? $export_args['end_date_from']   : false;
+		$end_to_date     = ! empty( $export_args['end_date_to'] )     ? $export_args['end_date_to']     : false;
+
+		// perhaps add meta query args for dates if there's at least one date set
+		if ( $start_from_date || $start_to_date || $end_from_date || $end_to_date ) {
+
+			$query_args['meta_query'] = array(); // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+
+			// query for User Memberships created within some date
+			if ( $start_from_date || $start_to_date ) {
+				$query_args['meta_query'][] = $this->get_date_range_meta_query_args( '_start_date', $start_from_date, $start_to_date );
+			}
+
+			// query for User Memberships expiring within some date
+			if ( $end_from_date || $end_to_date ) {
+				$query_args['meta_query'][] = $this->get_date_range_meta_query_args( '_end_date', $end_from_date, $end_to_date );
+			}
+
+			// join date query arguments
+			if ( 2 === count( $query_args['meta_query'] ) ) {
+				$query_args['meta_query']['relation'] = 'AND';
+			}
+		}
+
+		// query User Memberships with specific plans only
+		if ( ! empty( $export_args['plan_ids'] ) ) {
+			$query_args['post_parent__in'] = array_map( 'absint', (array) $export_args['plan_ids'] );
+		}
+
+		// query User Memberships that have specific statuses (defaults to 'any' otherwise)
+		if ( ! empty( $export_args['plan_statuses'] ) ) {
+			$query_args['post_status'] = (array) $export_args['plan_statuses'];
+		} else {
+			$query_args['post_status'] = 'any';
+		}
+
+		/**
+		 * Filters CSV Export User Memberships query args.
+		 *
+		 * @since 1.6.0
+		 *
+		 * @param array $query_args query parameters intended for `get_posts()`
+		 */
+		$query_args = (array) apply_filters( 'vip_woo_membership_addons_export_user_memberships_query_args', $query_args );
+		
 		$results = get_posts( $query_args );
-		$results = array_slice( $results, 0, 2500 );
+
+		// for debugging limited dataset only // phpcs:ignore Squiz.PHP.CommentedOutCode.Found
+		// $results = array_slice( $results, 0, 250 ); // phpcs:ignore Squiz.PHP.CommentedOutCode.Found
 
 		return $results;
 	}
