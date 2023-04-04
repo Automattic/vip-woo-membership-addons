@@ -92,6 +92,11 @@ function vip_woo_activate( ) {
   
 }
 register_activation_hook( __FILE__, 'VIPWooMembershipAddons\vip_woo_activate' );
-add_action( 'vipwma_export_cleanup', '\VIPWooMembershipAddons\Membership\export_cleanup()' );
+
+function run_export_cleanup( ) {
+    $membership = new \VIPWooMembershipAddons\Membership;
+    $membership->export_cleanup( true );
+}
+add_action( 'vipwma_export_cleanup', 'VIPWooMembershipAddons\run_export_cleanup' );
 
 

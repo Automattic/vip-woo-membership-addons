@@ -52,13 +52,27 @@ class VIP_Woo_Membership_CLI {
 
     /**
      * Export subscribers
+     *
+     * ## OPTIONS
+     *
+     * [--start_from_date=<start_from_date>]
+     * : The start date exports should start from YYYY-MM-DD.
+     * 
+     * [--start_to_date=<start_to_date>]
+     * : The start date exports should end YYYY-MM-DD.
+     * 
+     * [--end_from_date=<end_from_date>]
+     * : The end date exports should start from YYYY-MM-DD
+     * 
+     * [--end_to_date=<end_to_date>]
+     * : The end date exports should end YYYY-MM-DD
      */
 
     // Usage: wp vip-woo-membership exportsubscribers
     public function exportsubscribers( $args, $assoc_args ) {
 
         /**
-         * TODO: default is to export all subscribers but args and assoc args 
+         * Default is to export all subscribers but args and assoc args 
          * can be specified to pass date and other params to match fields in
          * the membership export
          */
@@ -96,7 +110,7 @@ class VIP_Woo_Membership_CLI {
      * ## OPTIONS
      *
      * <id>
-     * : The id of the export as displayed in the export list.
+     * : The id of the export (as displayed in the export list wp vip-woo-membership listexports).
      * 
      * ## EXAMPLES
      *
