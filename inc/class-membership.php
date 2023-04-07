@@ -266,10 +266,10 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 			}
 		}
 
-		$start_from_date = ! empty( $export_args['start_date_from'] ) ? $export_args['start_date_from'] : false;
-		$start_to_date   = ! empty( $export_args['start_date_to'] )   ? $export_args['start_date_to']   : false;
-		$end_from_date   = ! empty( $export_args['end_date_from'] )   ? $export_args['end_date_from']   : false;
-		$end_to_date     = ! empty( $export_args['end_date_to'] )     ? $export_args['end_date_to']     : false;
+		$start_from_date = ! empty( $export_args['start_from_date'] ) ? $export_args['start_from_date'] : false;
+		$start_to_date   = ! empty( $export_args['start_to_date'] )   ? $export_args['start_to_date']   : false;
+		$end_from_date   = ! empty( $export_args['end_from_date'] )   ? $export_args['end_from_date']   : false;
+		$end_to_date     = ! empty( $export_args['end_to_date'] )     ? $export_args['end_to_date']     : false;
 
 		// perhaps add meta query args for dates if there's at least one date set
 		if ( $start_from_date || $start_to_date || $end_from_date || $end_to_date ) {
