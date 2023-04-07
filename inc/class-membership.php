@@ -323,7 +323,6 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 
 	public function get_export_list( $assoc_args ) {
 		$jobs = $this->get_jobs( ['queued', 'processing', 'completed'] );
-		//print_r( $jobs );
 
 		$data = [];
 		foreach( $jobs as $job ) {
@@ -348,7 +347,7 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 	public function delete_export( $job ) {
 		// delete the export file
 		if( is_file( $job->file_path ) ) {
-			unlink( $job->file_path );
+			unlink( $job->file_path ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_unlink
 		}
 
 		// delete the job
