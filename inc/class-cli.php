@@ -57,6 +57,55 @@ class VIP_Woo_Membership_CLI {
     }
 
     /**
+     * View export info 
+     *  *
+     * ## OPTIONS
+     *
+     * <id>
+     * : The id of the export (as displayed in the export list wp vip-woo-membership listexports).
+     * 
+     * ## EXAMPLES
+     *
+     * wp vip-woo-membership export info <id>
+     */
+    public function exportinfo( $args, $assoc_args ) {
+        if(sizeof( $args ) > 0 && strlen( trim( $args[0] ) ) > 0 ){
+            // check if the export exists
+            $membership = new \VIPWooMembershipAddons\Membership;
+            $export = $membership->get_export( trim( $args[0] ) );
+            if ( $export !== null ) {
+
+                $data = [
+                    [
+                        'Key'    => 'id',
+                        'Value'  => $export->id,
+                    ],
+                    [
+                        'Key'    => 'created',
+                        'Value'  => $export->created_at,
+                    ],
+                    [
+                        'Key'    => 'status',
+                        'Value'  => $export->status,
+                    ],
+                    [
+                        'Key' => 'percentage',
+                        'Value' => $export->percentage . "%",
+                    ],
+                    [
+                        'Key' => 'download',
+                        'Value' =>  ( 'completed' === $export->status ) ? $export->file_url : 'not yet available',
+                    ],
+
+                ];
+
+                $formatter = new \WP_CLI\Formatter( $assoc_args, [ 'Key', 'Value' ] );
+		        $formatter->display_items( $data );
+            }
+        }
+    }
+
+    /**
      * Delete specific export by id
      *
      * ## OPTIONS
@@ -66,7 +115,7 @@ class VIP_Woo_Membership_CLI {
      * 
      * ## EXAMPLES
      *
-     * wp vip-woo-membership deleteexports xyz123
+     * wp vip-woo-membership deleteexports <id>
      */
 
     // Usage: wp vip-woo-membership deleteexports <id>
