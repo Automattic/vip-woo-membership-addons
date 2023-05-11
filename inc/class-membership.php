@@ -50,9 +50,9 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
         $headers = $this->get_headers( $params );
         $subscribers = $this->get_subscribers( $params );
 
-		$this->job->total = count( $subscribers );
-		$this->job->percentage = 0;
-		$this->job->status = 'processing';
+		// $this->job->total = count( $subscribers );
+		// $this->job->percentage = 0;
+		$this->job->status = 'finalizing';
 		$this->job = $this->update_job( $this->job );
 
         // output as csv to tmp file
@@ -60,12 +60,15 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
         $delimiter = $this->get_csv_delimiter( $this->job );
         $enclosure = $this->get_csv_enclosure();
         fputcsv( $file_handle, $this->prepare_csv_row_data( $headers, $headers ), $delimiter, $enclosure ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fputcsv
-        
+
 		$processed_memberships = 0;
+
+		\WP_CLI::log('Percentage increment: ' . $percentage_increment );
 
         foreach( $subscribers as $subscriber ){
             fputcsv( $file_handle, $this->prepare_csv_row_data( $headers, $subscriber ), $delimiter, $enclosure ); // phpcs:ignore WordPressVIPMinimum.Functions.RestrictedFunctions.file_ops_fputcsv
-			$processed_memberships += 1;
+			//$processed_memberships += 1;
+			//$this->job->progress  = $processed_memberships;
         }
 
         fclose( $file_handle );
@@ -75,8 +78,8 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 
 		// update job status
 		$this->job->status = 'completed';
-		$this->job->progress  = $processed_memberships;
-		$this->job->percentage = $this->get_percentage( $this->job );
+		//$this->job->progress  = $processed_memberships;
+		//$this->job->percentage = $this->get_percentage( $this->job );
 		$this->job = $this->update_job( $this->job );
 
         if ( defined( 'WP_CLI' ) && WP_CLI ) {
@@ -84,6 +87,37 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
         }
 
     }
+
+	public static function run_scheduled_export( $assoc_args ) {
+
+		//echo var_export($assoc_args, true);
+		//die('here');
+
+		$params = [
+            'format' => 'csv',
+            'limit' => false,
+            'date_start' => false,
+            'date_end' => false,
+            'export_id' => false,
+			'async' => true // TODO - use this for logging/ suppressing normal CLI output
+        ];
+
+        $params = array_merge( $params, $assoc_args );
+
+		// TODO - log this somewhere
+        //WP_CLI::log( 'exporting subscribers' );
+
+        $membership = new \VIPWooMembershipAddons\Membership;
+        $membership->export_subscribers( $params );		
+
+	}
+
+	public function schedule_export( $params ) {
+		$params['scheduled'] = time();
+		wp_schedule_single_event( time(), 'vip_woo_membership_export', [ $params ] );
+	}
+
+
 
     private function get_headers() {
 
@@ -126,12 +160,28 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
 
         $job = $this->job;
 
+		$this->job->total = count( $subscriber_posts );
+		$this->job->progress = 0;
+		$this->job->status = 'processing';
+		$this->job = $this->update_job( $this->job );
+
+
         if ( is_array( $subscriber_posts ) && count( $subscriber_posts ) > 0 ) {
 
-            if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			// To avoid spiking the db, we'll update the percentage in steps
+			if( $this->job->total > 100 ){
+				$percentage_increment = ceil( $this->job->total/100 );
+			} else {
+				$percentage_increment = 1;
+			}
+
+			if ( defined( 'WP_CLI' ) && WP_CLI ) {
+				\WP_CLI::log( 'percentage increment:' . $percentage_increment );
                 \WP_CLI::log( count($subscriber_posts) . ' subscriber(s) to export' );
-                $progress = \WP_CLI\Utils\make_progress_bar( 'Exporting subscribers', count($subscriber_posts) );
+                $progress = \WP_CLI\Utils\make_progress_bar( 'Processing subscribers', count($subscriber_posts) );
             }
+
+			$processed_count = 0;
 
             foreach ( $subscriber_posts as $sp ) {
                 $subscriber = [];
@@ -224,7 +274,21 @@ class Membership extends \WC_Memberships_CSV_Export_User_Memberships{
                 if ( defined( 'WP_CLI' ) && WP_CLI ) {
                     $progress->tick();
                 }
+
+				$processed_count += 1;
+				if( $processed_count > $percentage_increment ){
+					$this->job->progress = $processed_count;
+					$this->job->percentage = $this->get_percentage( $this->job );
+					$this->job = $this->update_job( $this->job );
+					sleep(5);
+					$percentage_increment += $percentage_increment;
+				}
+				
             }
+
+			$this->job->progress = $processed_count;
+			$this->job->percentage = $this->get_percentage( $this->job );
+			$this->job = $this->update_job( $this->job );
 
             if ( defined( 'WP_CLI' ) && WP_CLI ) {
                 $progress->finish();

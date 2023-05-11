@@ -99,4 +99,6 @@ function run_export_cleanup( ) {
 }
 add_action( 'vipwma_export_cleanup', 'VIPWooMembershipAddons\run_export_cleanup' );
 
+add_action( 'vip_woo_membership_export', [ '\VIPWooMembershipAddons\Membership', 'run_scheduled_export' ], 10, 1 );
+
 
